@@ -18,7 +18,7 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 作者	  	: 正点原子
 版本	   	: V1.0
 描述	   	: LED驱动文件
-其他	   	: 自动创建节点,使用新的API函数register_chrdev与 unregister_chrdev
+其他	   	: 自动创建驱动节点,使用新的API函数register_chrdev与 unregister_chrdev
 论坛 	   	: www.openedv.com
 日志	   	: 初版V1.0 2020/11/24 正点原子团队创建
 ***************************************************************/
