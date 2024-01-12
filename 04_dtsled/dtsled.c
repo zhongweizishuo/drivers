@@ -24,14 +24,15 @@
 日志	   	: 初版V1.0 2024
 
 注意		: 需要修改设备树文件stm32mp157d-atk.dts，给设备树添加led硬件的寄存器地址，然后编译设备树文件
-			  设备树文件最好添加到好区分的地方
+			  设备树文件最好添加到dts文件根目录好区分的地方
 ***************************************************************/
 #define DTSLED_CNT			1		  	/* 设备号个数 */
 #define DTSLED_NAME			"dtsled"	/* 名字 */
-#define LEDOFF 					0			/* 关灯 */
-#define LEDON 					1			/* 开灯 */
+#define LEDOFF 				0			/* 关灯 */
+#define LEDON 				1			/* 开灯 */
 
-/* 映射后的寄存器虚拟地址指针 */
+/* 指针声明：映射后的寄存器虚拟地址指针 
+声明静态 无类型指针，__iomem 是内核修饰符，表示用于访问IO内存*/
 static void __iomem *MPU_AHB4_PERIPH_RCC_PI;
 static void __iomem *GPIOI_MODER_PI;
 static void __iomem *GPIOI_OTYPER_PI;
@@ -39,18 +40,18 @@ static void __iomem *GPIOI_OSPEEDR_PI;
 static void __iomem *GPIOI_PUPDR_PI;
 static void __iomem *GPIOI_BSRR_PI;
 
-/* dtsled设备结构体 */
+/* 抽象的dtsled设备结构体 */
 struct dtsled_dev{
 	dev_t devid;			/* 设备号 	 */
 	struct cdev cdev;		/* cdev 	*/
-	struct class *class;		/* 类 		*/
+	struct class *class;	/* 类 		*/
 	struct device *device;	/* 设备 	 */
 	int major;				/* 主设备号	  */
 	int minor;				/* 次设备号   */
-	struct device_node	*nd; /* 设备节点 */
+	struct device_node	*nd; /* 设备节点：存储设备的属性值 */
 };
 
-struct dtsled_dev dtsled;	/* led设备 */
+struct dtsled_dev dtsled;	/* led设备 实例化*/
 
 /*
  * @description		: LED打开/关闭
@@ -129,7 +130,7 @@ static ssize_t led_write(struct file *filp, const char __user *buf, size_t cnt, 
 	retvalue = copy_from_user(databuf, buf, cnt);
 	if(retvalue < 0) {
 		printk("kernel write failed!\r\n");
-		return -EFAULT;
+		return -EFAULT; // 具体的错误代码
 	}
 
 	ledstat = databuf[0];		/* 获取状态值 */
@@ -174,7 +175,7 @@ static int __init led_init(void)
 	const char *str;
 	struct property *proper;
 
-	/* 获取设备树中的属性数据，使用内核的OF函数来读取设备树文件的属性 */
+	/* 获取设备树中的属性数据，使用内核的OF函数来读取设备树文件的属性 ************************************************************/
 	/* 1、获取设备节点：stm32mp1_led */
 	dtsled.nd = of_find_node_by_path("/stm32mp1_led");
 	if(dtsled.nd == NULL) {
@@ -200,7 +201,7 @@ static int __init led_init(void)
 		printk("status = %s\r\n",str);
 	}
 
-	/* 4、获取reg属性内容 */
+	/* 4、获取reg属性内容 ：将获取到的都存regdata数据中*/
 	ret = of_property_read_u32_array(dtsled.nd, "reg", regdata, 12);
 	if(ret < 0) {
 		printk("reg property read failed!\r\n");
@@ -212,8 +213,8 @@ static int __init led_init(void)
 		printk("\r\n");
 	}
 
-	/* 初始化LED */
-	/* 1、寄存器地址映射， 使用OF函数 */
+	/* 初始化LED ******************************************************************************************************************/
+	/* 1、寄存器地址映射， 使用OF函数 而不是ioremap()*/
 	MPU_AHB4_PERIPH_RCC_PI = of_iomap(dtsled.nd, 0);
   	GPIOI_MODER_PI = of_iomap(dtsled.nd, 1);
 	GPIOI_OTYPER_PI = of_iomap(dtsled.nd, 2);
@@ -255,7 +256,7 @@ static int __init led_init(void)
     val |= (0x1 << 0);
     writel(val, GPIOI_BSRR_PI);
 
-	/* 注册字符设备驱动 */
+	/* 注册字符设备驱动 ******************************************************************************************************/
 	/* 1、创建设备号 */
 	if (dtsled.major) {		/*  定义了设备号 */
 		dtsled.devid = MKDEV(dtsled.major, 0);
