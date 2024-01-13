@@ -46,7 +46,7 @@
 				cp arch/arm/boot/dts/stm32mp157d-atk.dtb ~/linux/tftpboot/ -f	*/
 	// 以下是dts更改部分：
 	gpioled{
-		compatible = "alientek, led";
+		compatible = "alientek,led";
 		status = "okay";
 		led-gpio = <&gpioi 0 GPIO_ACTIVE_LOW>;	//GPIO的PI0，低电平有效
 	};
