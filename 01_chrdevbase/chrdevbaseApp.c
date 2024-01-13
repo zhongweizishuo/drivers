@@ -18,7 +18,7 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 日志	   	: 初版V1.0 2019/1/30 正点原子团队创建
 ***************************************************************/
 
-static char usrdata[] = {"usr data!"};
+static char usrdata[] = {"data from user to kernel!"};
 
 /*
  * @description		: main主程序
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
 	char *filename;
 	char readbuf[100], writebuf[100];
 
-	// 参数数量不对判断
+	// 参数数量不对判断:如果不是3个，输出错误信息并返回-1表示失败。
 	if(argc != 3){
 		printf("Error Usage!\r\n");
 		return -1;
@@ -48,17 +48,20 @@ int main(int argc, char *argv[])
 	}
 
 	if(atoi(argv[2]) == 1){ /* 从驱动文件读取数据 */
+	// 在用户空间中，read(fd, readbuf, 50)读取50个字节从fd到readbuf;
+	// 存入用户空间的readbuf,可以使用printf（）打印出来；
 		retvalue = read(fd, readbuf, 50);
 		if(retvalue < 0){
 			printf("read file %s failed!\r\n", filename);
 		}else{
-			/*  读取成功，打印出读取成功的数据 */
+			/* 读取成功，打印出读取成功的数据 */
 			printf("read data:%s\r\n",readbuf);
 		}
 	}
 
 	if(atoi(argv[2]) == 2){
  	/* 向设备驱动写数据 */
+	// usrdata到writebuf到fd(内核接受),转内核处理
 		memcpy(writebuf, usrdata, sizeof(usrdata));
 		retvalue = write(fd, writebuf, 50);
 		if(retvalue < 0){

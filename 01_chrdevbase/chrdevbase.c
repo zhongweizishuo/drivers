@@ -51,9 +51,9 @@ static ssize_t chrdevbase_read(struct file *filp, char __user *buf, size_t cnt, 
 	memcpy(readbuf, kerneldata, sizeof(kerneldata));
 	retvalue = copy_to_user(buf, readbuf, cnt);
 	if(retvalue == 0){
-		printk("kernel senddata ok!\r\n");
+		printk("kernel send data ok!\r\n");
 	}else{
-		printk("kernel senddata failed!\r\n");
+		printk("kernel send data failed!\r\n");
 	}
 	
 	//printk("chrdevbase read!\r\n");
@@ -71,7 +71,8 @@ static ssize_t chrdevbase_read(struct file *filp, char __user *buf, size_t cnt, 
 static ssize_t chrdevbase_write(struct file *filp, const char __user *buf, size_t cnt, loff_t *offt)
 {
 	int retvalue = 0;
-	/* 接收用户空间传递给内核的数据并且打印出来 */
+	/* 接收用户空间传递给内核的数据并且打印出来
+	buf接受并存入writebuf；接受成功则retvalue==0,可以使用printk（）打印出来； */
 	retvalue = copy_from_user(writebuf, buf, cnt);
 	if(retvalue == 0){
 		printk("kernel recevdata:%s\r\n", writebuf);
