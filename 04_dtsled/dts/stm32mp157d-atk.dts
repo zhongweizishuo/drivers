@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: (GPL-2.0+ OR BSD-3-Clause)
+/*
+ * Copyright (C) STMicroelectronics 2019 - All Rights Reserved
+ * Author: Alexandre Torgue <alexandre.torgue@st.com> for STMicroelectronics.
+ */
+/dts-v1/;
+
+#include "stm32mp157.dtsi"
+#include "stm32mp15xd.dtsi"
+#include "stm32mp15-pinctrl.dtsi"
+#include "stm32mp15xxaa-pinctrl.dtsi"
+#include "stm32mp157-m4-srm.dtsi"
+#include "stm32mp157-m4-srm-pinctrl.dtsi"
+#include "stm32mp157d-atk.dtsi"
+
+/ {
+	model = "STMicroelectronics STM32MP157D eval daughter";
+	compatible = "st,stm32mp157d-ed1", "st,stm32mp157";
+
+	chosen {
+		stdout-path = "serial0:115200n8";
+	};
+
+	aliases {
+		serial0 = &uart4;
+	};
+
+	reserved-memory {
+		gpu_reserved: gpu@f6000000 {
+			reg = <0xf6000000 0x8000000>;
+			no-map;
+		};
+
+		optee_memory: optee@fe000000 {
+			reg = <0xfe000000 0x02000000>;
+			no-map;
+		};
+	};
+	
+	/***************************04_dtsled start******************************************************
+	教程		:【正点原子】STM32MP1嵌入式Linux驱动开发指南V2.1.pdf	【章节】24.3.1	
+	文件名		: 04_dtsled
+	作者+日期  	: zhong 20240109
+	描述	   	: 直接编辑led引脚寄存器地址的DTS文件
+	使用方法	:make dtbs	//见"dts使用教程.md"
+				cp arch/arm/boot/dts/stm32mp157d-atk.dtb ~/linux/tftpboot/ -f
+	reg属性		:设置了驱动里面所要使用的寄存器物理地址*/
+	// 以下是dts更改部分：
+	stm32mp1_led{
+		compatible = "atkstm32mp1-led";
+		status = "okay";
+		reg = < 0X50000A28 0X04 	/* RCC_MP_AHB4ENSETR ;寄存器地址为0X50000A28，长度为 4个字节*/ 
+				0X5000A000 0X04 	/* GPIOI_MODER */ 
+				0X5000A004 0X04 	/* GPIOI_OTYPER */ 
+				0X5000A008 0X04 	/* GPIOI_OSPEEDR */ 
+				0X5000A00C 0X04 	/* GPIOI_PUPDR */ 
+				0X5000A018 0X04 >;  /* GPIOI_BSRR */
+	};
+	/**************************04_dtsled end*********************************************************/
+
+};
+
+&cpu1{
+	cpu-supply = <&vddcore>;
+};
+
+&gpu {
+	contiguous-area = <&gpu_reserved>;
+	status = "okay";
+};
+
+&optee {
+	status = "okay";
+};
