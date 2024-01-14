@@ -28,6 +28,7 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 #define GPIOLED_NAME		"gpioled"	/* 名字 */
 #define LEDOFF 				0			/* 关灯 */
 #define LEDON 				1			/* 开灯 */
+#define LEDtwinkle 			3			/* 灯闪烁 */
 
 /* gpioled设备结构体 */
 struct gpioled_dev{
@@ -96,6 +97,12 @@ static ssize_t led_write(struct file *filp, const char __user *buf, size_t cnt, 
 		gpio_set_value(dev->led_gpio, 0);	/* 打开LED灯 *****************************************/
 	} else if(ledstat == LEDOFF) {
 		gpio_set_value(dev->led_gpio, 1);	/* 关闭LED灯 *****************************************/
+	}else if(ledstat == LEDtwinkle){
+		// 灯闪烁
+		ssleep(1);
+		gpio_set_value(dev->led_gpio, 0);
+		ssleep(1);
+		gpio_set_value(dev->led_gpio, 1);
 	}
 	return 0;
 }
