@@ -17,17 +17,19 @@
 #include <asm/uaccess.h>
 #include <asm/io.h>
 /***************************************************************
-Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
-文件名		: timer.c
+文件名		: timer.c				章节【30.3.2】
 作者	  	: 正点原子Linux团队
 版本	   	: V1.0
 描述	   	: Linux内核定时器实验
 其他	   	: 无
-论坛 	   	: www.openedv.com
-日志	   	: 初版V1.0 2021/01/5 正点原子Linux团队创建
 ***************************************************************/
 #define TIMER_CNT		1		/* 设备号个数 	*/
 #define TIMER_NAME		"timer"	/* 名字 		*/
+/*	使用 _IO 宏来创建一个用于控制设备的 ioctl 命令
+	格式：_IO(type, number)
+	type 是一个8位无符号整数，通常被用来表示设备类型，用于将 ioctl 命令与不同的设备或模块关联起来。
+	number 是一个8位无符号整数，用于表示特定的 ioctl 命令。
+*/ 
 #define CLOSE_CMD 		(_IO(0XEF, 0x1))	/* 关闭定时器 */
 #define OPEN_CMD		(_IO(0XEF, 0x2))	/* 打开定时器 */
 #define SETPERIOD_CMD	(_IO(0XEF, 0x3))	/* 设置定时器周期命令 */
@@ -45,25 +47,25 @@ struct timer_dev{
 	struct device_node	*nd; /* 设备节点 */
 	int led_gpio;			/* key所使用的GPIO编号		*/
 	
-	int timeperiod; 		/* 定时周期,单位为ms */
+	int timeperiod; 		/* 定时周期,单位为ms *************/
 	struct timer_list timer;/* 定义一个定时器*/
 	spinlock_t lock;		/* 定义自旋锁 */
 };
 
-struct timer_dev timerdev;	/* timer设备 */
+struct timer_dev timerdev;	/* 实例化timer设备 */
 
 /*
- * @description	: 初始化LED灯IO，open函数打开驱动的时候
- * 				  初始化LED灯所使用的GPIO引脚。
+ * @description	: 使用led的dts属性初始化LED灯IO，
+ * 				  open函数打开驱动的时候，初始化LED灯所使用的GPIO引脚。
  * @param 		: 无
  * @return 		: 无
  */
 static int led_init(void)
 {
-		int ret;
+	int ret;
 	const char *str;
 	
-	/* 设置LED所使用的GPIO */
+	/* 使用led的dts属性，设置LED所使用的GPIO */
 	/* 1、获取设备节点：timerdev */
 	timerdev.nd = of_find_node_by_path("/gpioled");
 	if(timerdev.nd == NULL) {
@@ -106,7 +108,7 @@ static int led_init(void)
         return ret;
 	}
 
-		/* 6、设置PI0为输出，并且输出高电平，默认关闭LED灯 */
+	/* 6、设置PI0为输出，并且输出高电平，默认关闭LED灯 */
 	ret = gpio_direction_output(timerdev.led_gpio, 1);
 	if(ret < 0) {
 		printk("can't set gpio!\r\n");
@@ -116,10 +118,10 @@ static int led_init(void)
 }
 
 /*
- * @description		: 打开设备
+ * @description		: 打开定时器设备
  * @param - inode 	: 传递给驱动的inode
  * @param - filp 	: 设备文件，file结构体有个叫做private_data的成员变量
- * 					  一般在open的时候将private_data指向设备结构体。
+ * 					  一般在open的时候将private_data指向设备结构体。***************************
  * @return 			: 0 成功;其他 失败
  */
 static int timer_open(struct inode *inode, struct file *filp)
@@ -137,7 +139,7 @@ static int timer_open(struct inode *inode, struct file *filp)
 }
 
 /*
- * @description		: ioctl函数，
+ * @description		: ioctl函数：App调用ioctl(),向驱动发送控制信息
  * @param - filp 	: 要打开的设备文件(文件描述符)
  * @param - cmd 	: 应用程序发送过来的命令
  * @param - arg 	: 参数
@@ -154,12 +156,14 @@ static long timer_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned l
 			del_timer_sync(&dev->timer);
 			break;
 		case OPEN_CMD:		/* 打开定时器 */
+			// 上锁，操做数据timerperiod，解锁
 			spin_lock_irqsave(&dev->lock, flags);
 			timerperiod = dev->timeperiod;
 			spin_unlock_irqrestore(&dev->lock, flags);
 			mod_timer(&dev->timer, jiffies + msecs_to_jiffies(timerperiod));
 			break;
 		case SETPERIOD_CMD: /* 设置定时器周期 */
+			// 上锁，操做数据timerperiod，解锁
 			spin_lock_irqsave(&dev->lock, flags);
 			dev->timeperiod = arg;
 			spin_unlock_irqrestore(&dev->lock, flags);
@@ -172,7 +176,7 @@ static long timer_unlocked_ioctl(struct file *filp, unsigned int cmd, unsigned l
 }
 
 /*
- * @description		: 关闭/释放设备
+ * @description		: 关闭/释放设备；对应App的close(fd);
  * @param - filp 	: 要关闭的设备文件(文件描述符)
  * @return 			: 0 成功;其他 失败
  */
@@ -190,15 +194,16 @@ static int led_release(struct inode *inode, struct file *filp)
 static struct file_operations timer_fops = {
 	.owner = THIS_MODULE,
 	.open = timer_open,
-	.unlocked_ioctl = timer_unlocked_ioctl,
+	.unlocked_ioctl = timer_unlocked_ioctl,	/* 不一定非的是4大金刚函数************* */
 	.release = 	led_release,
 };
 
 /* 定时器回调函数 */
 void timer_function(struct timer_list *arg)
 {
-	/* 	from_timer是个宏，可以根据结构体的成员地址，获取到这个结构体的首地址。
-		第一个参数表示结构体，第二个参数表示第一个参数里的一个成员，第三个参数表示第二个参数的类型,得到第一个参数的首地址。
+	/* 	from_timer是个宏，是对container_of函数的封装，可以根据结构体的成员地址，获取到这个结构体的首地址。
+		第一个参数表示结构体dev，第二个参数表示第一个参数里有一个成员timer，第三个参数表示第二个参数timer的类型timer_list,
+		最终得到第一个参数的首地址。
 	*/
 	struct timer_dev *dev = from_timer(dev, arg, timer);
 	static int sta = 1;
@@ -229,7 +234,7 @@ static int __init timer_init(void)
 
 	/* 注册字符设备驱动 */
 	/* 1、创建设备号 */
-	if (timerdev.major) {		/*  定义了设备号 */
+	if (timerdev.major) {			/*  定义了设备号 */
 		timerdev.devid = MKDEV(timerdev.major, 0);
 		ret = register_chrdev_region(timerdev.devid, TIMER_CNT, TIMER_NAME);
 		if(ret < 0) {
