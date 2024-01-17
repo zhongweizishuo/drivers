@@ -1,6 +1,6 @@
 /***************************************************************
-Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
-文件名		: key.c
+章节：		[31.3.1]
+文件名		: key.c	
 作者	  	: 正点原子Linux团队
 版本	   	: V1.0
 描述	   	: Linux中断驱动实验
@@ -30,7 +30,7 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 #define KEY_CNT			1		/* 设备号个数 	*/
 #define KEY_NAME		"key"	/* 名字 		*/
 
-/* 定义按键状态 */
+/* 定义按键三种状态************************ */
 enum key_status {
     KEY_PRESS = 0,      /* 按键按下 */ 
     KEY_RELEASE,        /* 按键松开 */ 
@@ -45,14 +45,15 @@ struct key_dev{
 	struct device *device;		/* 设备 	 */
 	struct device_node	*nd; 	/* 设备节点 */
 	int key_gpio;				/* key所使用的GPIO编号		*/
-	struct timer_list timer;	/* 按键值 		*/
-	int irq_num;				/* 中断号 		*/
-	spinlock_t spinlock;		/* 自旋锁		*/
+	struct timer_list timer;	/* 定时器，实现按键去抖 ***************************/
+	int irq_num;				/* 按键IO对应的中断号   **************************/
+	spinlock_t spinlock;		/* 自旋锁，并发保护		*/
 };
 
 static struct key_dev key;          /* 按键设备 */
 static int status = KEY_KEEP;   	/* 按键状态 */
 
+// 中断处理函数：触发中断之后，开启计时器，延时15ms
 static irqreturn_t key_interrupt(int irq, void *dev_id)
 {
 	/* 按键防抖处理，开启定时器延时15ms */
@@ -61,8 +62,8 @@ static irqreturn_t key_interrupt(int irq, void *dev_id)
 }
 
 /*
- * @description	: 初始化按键IO，open函数打开驱动的时候
- * 				  初始化按键所使用的GPIO引脚。
+ * @description	: 使用dts初始化按键IO:对设备树属性解析，获取key节点
+ * 				  open函数打开驱动的时候初始化按键所使用的GPIO引脚。
  * @param 		: 无
  * @return 		: 无
  */
@@ -71,7 +72,7 @@ static int key_parse_dt(void)
 	int ret;
 	const char *str;
 	
-	/* 设置LED所使用的GPIO */
+	/* 设置key所使用的GPIO */
 	/* 1、获取设备节点：key */
 	key.nd = of_find_node_by_path("/key");
 	if(key.nd == NULL) {
@@ -94,7 +95,7 @@ static int key_parse_dt(void)
 		return -EINVAL;
 	}
 
-    if (strcmp(str, "alientek,key")) {
+    if (strcmp(str, "zhong,key")) {
         printk("key: Compatible match failed\n");
         return -EINVAL;
     }
@@ -106,7 +107,7 @@ static int key_parse_dt(void)
 		return -EINVAL;
 	}
 
-    /* 5 、获取GPIO对应的中断号 */
+    /* 5 、获取GPIO对应的中断号 **************************/
     key.irq_num = irq_of_parse_and_map(key.nd, 0);
     if(!key.irq_num){
         return -EINVAL;
@@ -115,12 +116,13 @@ static int key_parse_dt(void)
 	printk("key-gpio num = %d\r\n", key.key_gpio);
 	return 0;
 }
-
+/* 对GPIO与对应的中断进行初始化 **************************/
 static int key_gpio_init(void)
 {
 	int ret;
     unsigned long irq_flags;
 	
+	// gpio申请
 	ret = gpio_request(key.key_gpio, "KEY0");
     if (ret) {
         printk(KERN_ERR "key: Failed to request key-gpio\n");
@@ -130,12 +132,12 @@ static int key_gpio_init(void)
 	/* 将GPIO设置为输入模式 */
     gpio_direction_input(key.key_gpio);
 
-   /* 获取设备树中指定的中断触发类型 */
+   /* 获取设备树中key0节点指定的中断触发类型 */
 	irq_flags = irq_get_trigger_type(key.irq_num);
 	if (IRQF_TRIGGER_NONE == irq_flags)
 		irq_flags = IRQF_TRIGGER_FALLING | IRQF_TRIGGER_RISING;
 		
-	/* 申请中断 */
+	/* 申请中断：默认会自动使能*/
 	ret = request_irq(key.irq_num, key_interrupt, irq_flags, "Key0_IRQ", NULL);
 	if (ret) {
         gpio_free(key.key_gpio);
@@ -145,27 +147,34 @@ static int key_gpio_init(void)
 	return 0;
 }
 
+/*
+ * @description	: 定时器定时函数
+ * 				  
+ * @param 	timer_list	:未使用
+ * @return 		: 无
+ */
 static void key_timer_function(struct timer_list *arg)
 {
     static int last_val = 1;
     unsigned long flags;
     int current_val;
 
-    /* 自旋锁上锁 */
+	// status数值操作过程需要上锁，上锁分三步走：上锁，检查or操作数据，解锁
+    /* 1. 自旋锁上锁 */
     spin_lock_irqsave(&key.spinlock, flags);
 
-    /* 读取按键值并判断按键当前状态 */
+    /* 2. 读取按键值并判断按键当前状态 status */
     current_val = gpio_get_value(key.key_gpio);
-    if (0 == current_val && last_val)       /* 按下 */ 
+    if ((0 == current_val) && last_val)       /* 按下 :1 --> 0 */ 
         status = KEY_PRESS;
     else if (1 == current_val && !last_val)
-        status = KEY_RELEASE;  	 			/* 松开 */ 
+        status = KEY_RELEASE;  	 			 /* 松开 : 0 -->1*/ 
     else
-        status = KEY_KEEP;              	/* 状态保持 */ 
+        status = KEY_KEEP;              	 /* 状态保持 */ 
 
     last_val = current_val;
 
-    /* 自旋锁解锁 */
+    /* 3. 自旋锁解锁 */
     spin_unlock_irqrestore(&key.spinlock, flags);
 }
 
@@ -182,7 +191,7 @@ static int key_open(struct inode *inode, struct file *filp)
 }
 
 /*
- * @description     : 从设备读取数据 
+ * @description     : 从设备读取数据，对应用户空间的App的read()函数 
  * @param – filp        : 要打开的设备文件(文件描述符)
  * @param – buf     : 返回给用户空间的数据缓冲区
  * @param – cnt     : 要读取的数据长度
@@ -194,17 +203,19 @@ static ssize_t key_read(struct file *filp, char __user *buf,
 {
     unsigned long flags;
     int ret;
-
-    /* 自旋锁上锁 */
+	
+	// 按键状态status数值需要在不同空间进行传输，过程需要上锁，
+	// 上锁分三步走：上锁，检查or操作数据，解锁
+    /* 1. 自旋锁上锁 */
     spin_lock_irqsave(&key.spinlock, flags);
 
-    /* 将按键状态信息发送给应用程序 */
+    /* 2. 将按键状态信息发送给应用程序 */
     ret = copy_to_user(buf, &status, sizeof(int));
 
     /* 状态重置 */
     status = KEY_KEEP;
 
-    /* 自旋锁解锁 */
+    /* 3. 自旋锁解锁 */
     spin_unlock_irqrestore(&key.spinlock, flags);
 
     return ret;
@@ -233,11 +244,11 @@ static int key_release(struct inode *inode, struct file *filp)
 	return 0;
 }
 
-/* 设备操作函数 */
+/* 设备操作函数 fops 结构体*/
 static struct file_operations key_fops = {
 	.owner = THIS_MODULE,
 	.open = key_open,
-	.read = key_read,
+	.read = key_read,	//按键检测，read()是核心
 	.write = key_write,
 	.release = 	key_release,
 };
@@ -251,7 +262,7 @@ static int __init mykey_init(void)
 {
 	int ret;
 	
-	/* 初始化自旋锁 */
+	/* 初始化自旋锁（在上面用锁的程序中，需要先对锁进行初始化） */
 	spin_lock_init(&key.spinlock);
 	
 	/* 设备树解析 */
@@ -293,7 +304,7 @@ static int __init mykey_init(void)
 		goto destroy_class;
 	}
 	
-	/* 6、初始化timer，设置定时器处理函数,还未设置周期，所有不会激活定时器 */
+	/* 6、初始化timer，设置定时器处理函数,还未设置周期，所有不会激活定时器 **************/
 	timer_setup(&key.timer, key_timer_function, 0);
 	
 	return 0;
@@ -320,10 +331,10 @@ static void __exit mykey_exit(void)
 	/* 注销字符设备驱动 */
 	cdev_del(&key.cdev);/*  删除cdev */
 	unregister_chrdev_region(key.devid, KEY_CNT); /* 注销设备号 */
-	del_timer_sync(&key.timer);		/* 删除timer */
+	del_timer_sync(&key.timer);		/* 删除timer ********************/
 	device_destroy(key.class, key.devid);/*注销设备 */
 	class_destroy(key.class); 		/* 注销类 */
-	free_irq(key.irq_num, NULL);	/* 释放中断 */
+	free_irq(key.irq_num, NULL);	/* 释放中断 ***********************/
 	gpio_free(key.key_gpio);		/* 释放IO */
 }
 

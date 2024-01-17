@@ -1,13 +1,10 @@
 /***************************************************************
-Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 文件名              : keyApp.c
 作者                : 正点原子Linux团队
 版本                : V1.0
 描述                : Linux中断驱动实验
 其他                : 无
 使用方法            : ./keyirqApp /dev/key
-论坛                : www.openedv.com
-日志                : 初版V1.0 2019/1/30 正点原子Linux团队创建
 ***************************************************************/
 
 #include <stdio.h>
@@ -31,9 +28,7 @@ int main(int argc, char *argv[])
 
     /* 判断传参个数是否正确 */
     if(2 != argc) {
-        printf("Usage:\n"
-             "\t./keyApp /dev/key\n"
-            );
+        printf("Error usage: ./keyirqApp /dev/key \n");
         return -1;
     }
 
