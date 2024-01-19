@@ -154,7 +154,7 @@ static int __init led_init(void)
 
 	/* 1. initialize atomic lock *****************************************/
 	gpioled.lock = (atomic_t)ATOMIC_INIT(0);
-	/* 2. lock set 1 *****************************************/
+	/* 2. lock set 1 将锁的值设置为1 *****************************************/
 	atomic_set(&gpioled.lock, 1);
 
 	/* 设置LED所使用的GPIO */
