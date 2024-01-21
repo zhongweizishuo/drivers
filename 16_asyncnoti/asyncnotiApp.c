@@ -6,8 +6,9 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 描述                   : 异步通知测试程序
 其他                   : 无
 使用方法               : ./asyncKeyApp /dev/key
-论坛                   : www.openedv.com
-日志                   : 初版V1.0 2021/01/19 正点原子Linux团队创建
+
+异步通知（信号）机制依赖于异步通知的请求，即在用户空间程序中使用相关的系统调用
+（如 fcntl 中的 F_SETOWN 和 F_SETFL）来设置异步通知
 ***************************************************************/
 
 #include <stdio.h>
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    /* 打开设备 */
+    /* 打开设备  非阻塞打开：App不挂起休眠，一直在轮询*/
     fd = open(argv[1], O_RDONLY | O_NONBLOCK);
     if(0 > fd) {
         printf("ERROR: %s file open failed!\n", argv[1]);
@@ -64,7 +65,7 @@ int main(int argc, char *argv[])
     }
 
     /* 设置信号SIGIO的处理函数 */
-    signal(SIGIO, sigio_signal_func);
+    signal(SIGIO, sigio_signal_func);       // 收到SIGIO信号，调用sigio_signal_func函数处理
     fcntl(fd, F_SETOWN, getpid());			// 将当前进程的进程号告诉给内核
     flags = fcntl(fd, F_GETFD);				// 获取当前的进程状态
     fcntl(fd, F_SETFL, flags | FASYNC);		// 设置进程启用异步通知功能
