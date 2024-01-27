@@ -13,8 +13,11 @@ Copyright © ALIENTEK Co., Ltd. 1998-2029. All rights reserved.
 
 /* AP3316C寄存器 */
 #define AP3216C_SYSTEMCONG	0x00	/* 配置寄存器       */
+// 中断的两个寄存器没有用到
 #define AP3216C_INTSTATUS	0X01	/* 中断状态寄存器   */
 #define AP3216C_INTCLEAR	0X02	/* 中断清除寄存器   */
+
+// 6个数据寄存器，保存着ALS、PS、IR数据值
 #define AP3216C_IRDATALOW	0x0A	/* IR数据低字节     */
 #define AP3216C_IRDATAHIGH	0x0B	/* IR数据高字节     */
 #define AP3216C_ALSDATALOW	0x0C	/* ALS数据低字节    */

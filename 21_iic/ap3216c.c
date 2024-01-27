@@ -141,21 +141,21 @@ void ap3216c_readdata(struct ap3216c_dev *dev)
 	unsigned char i =0;
     unsigned char buf[6];
 	
-	/* 循环读取所有传感器数据 */
+	/* 循环读取所有传感器数据，一共6个寄存器 */
     for(i = 0; i < 6; i++) {
         buf[i] = ap3216c_read_reg(dev, AP3216C_IRDATALOW + i);	
     }
 
     if(buf[0] & 0X80) 	/* IR_OF位为1,则数据无效 */
 		dev->ir = 0;					
-	else 				/* 读取IR传感器的数据   		*/
+	else /* 读取IR传感器的数据：buf[0]取最低2位（& 0X03）与buf[1]左移2位之后取或（追加），一共10位	*/
 		dev->ir = ((unsigned short)buf[1] << 2) | (buf[0] & 0X03); 			
 	
-	dev->als = ((unsigned short)buf[3] << 8) | buf[2];	/* 读取ALS传感器的数据 			 */  
+	dev->als = ((unsigned short)buf[3] << 8) | buf[2];	/* 读取ALS传感器的数据，一共16位 			 */  
 	
     if(buf[4] & 0x40)	/* IR_OF位为1,则数据无效 			*/
 		dev->ps = 0;    													
-	else 				/* 读取PS传感器的数据    */
+	else /* 读取PS传感器的数据：buf[4]取最低4位（& 0X0F）与buf[5]取最低6位（& 0X3F）并左移4位之后取或（追加），一共10位    */
 		dev->ps = ((unsigned short)(buf[5] & 0X3F) << 4) | (buf[4] & 0X0F); 
 }
 
@@ -172,10 +172,10 @@ static int ap3216c_open(struct inode *inode, struct file *filp)
 	struct cdev *cdev = filp->f_path.dentry->d_inode->i_cdev;
 	struct ap3216c_dev *ap3216cdev = container_of(cdev, struct ap3216c_dev, cdev);
 
-	/* 初始化AP3216C :给寄存器写入值即可*/
-	ap3216c_write_reg(ap3216cdev, AP3216C_SYSTEMCONG, 0x04);		/* 复位AP3216C 			*/
+	/* 初始化AP3216C :给寄存器写入对应值即可*/
+	ap3216c_write_reg(ap3216cdev, AP3216C_SYSTEMCONG, 0x04);		/* 写 0x04,软件复位AP3216C 			*/
 	mdelay(50);														/* AP3216C复位最少10ms 	*/
-	ap3216c_write_reg(ap3216cdev, AP3216C_SYSTEMCONG, 0X03);		/* 开启ALS、PS+IR 		*/
+	ap3216c_write_reg(ap3216cdev, AP3216C_SYSTEMCONG, 0X03);		/* 写 0x03，使能ALS、PS+IR 		*/
 	return 0;
 }
 

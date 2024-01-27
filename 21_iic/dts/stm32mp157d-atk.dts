@@ -53,8 +53,37 @@
 		pinctrl-name = "default";
 		pinctrl-0 = <&beep_pins_a>;
 	};
-	/**************************06_beep, 19_miscbeep dts end*********************************************************/
+	/**************************06_beep, 19_miscbeep dts end********************************************************/
 
+			
+	/************************** LCD dts start******************************************************
+	教程		:【正点原子】STM32MP1嵌入式Linux驱动开发指南V2.1.pdf	【章节】40.5.1
+	文件名		: LCD驱动
+	作者+日期  	: zhong 2024-0123 */
+	panel_rgb: panel-rgb {
+		compatible = "alientek,lcd-rgb";
+		backlight = <&backlight>;
+		status = "okay";
+
+		port {
+		rgb_panel_in: endpoint {
+			remote-endpoint = <&ltdc_ep0_out>;
+			};
+		};
+	};
+
+	// 根节点创建一个backlight 节点
+	backlight: backlight {
+		compatible = "pwm-backlight";
+		pwms = <&pwm4 1 5000000>;
+		brightness-levels = <0 4 8 16 32 64 128 255>;
+		power-supply = <&v3v3>;
+		default-brightness-level = <7>;
+		status = "okay";
+	};
+	/************************** LCD dts end*********************************************************/
+
+	
 };
 
 &cpu1{
@@ -86,3 +115,39 @@
 		reg = <0x1e>;
 	};
  };
+
+/********************************************************************************
+教程		:【正点原子】STM32MP1嵌入式Linux驱动开发指南V2.1.pdf	【章节】40.5.1
+文件名		: LCD驱动
+作者+日期  	: zhong 2024-0123
+*/
+&ltdc {
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&ltdc_pins_b>;
+	pinctrl-1 = <&ltdc_pins_sleep_b>;
+	status = "okay";
+
+	port {
+		#address-cells = <1>;
+		#size-cells = <0>;
+		
+		ltdc_ep0_out: endpoint@0 {
+			reg = <0>;
+			remote-endpoint = <&rgb_panel_in>;
+		};
+	};
+ };
+
+&timers4 {
+	status = "okay";
+	/* spare dmas for other usage */
+	/delete-property/dmas;
+	/delete-property/dma-names;
+	pwm4: pwm {
+		pinctrl-0 = <&pwm4_pins_b>;
+		pinctrl-1 = <&pwm4_sleep_pins_b>;
+		pinctrl-names = "default", "sleep";
+		#pwm-cells = <2>;
+		status = "okay";
+	};
+};
